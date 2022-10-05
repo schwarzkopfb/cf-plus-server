@@ -1,6 +1,7 @@
 # cf-plus-server
 
-[What's this?](https://github.com/schwarzkopfb/cf-plus)
+* [What's this?](https://github.com/schwarzkopfb/cf-plus)
+* [Browser Extension (client)](https://github.com/schwarzkopfb/cf-plus-browser-extension)
 
 The server provides a simple REST API for user management and powerUp suggestions. It's backed by [Redis](https://redis.io) for fast permanent storage and based on [Deno](https://deno.land) for low latency.
 
