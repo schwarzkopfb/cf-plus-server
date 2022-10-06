@@ -16,6 +16,9 @@ const app = new Application();
 const router = new Router();
 
 router
+  .get("/", (ctx) => {
+    ctx.response.redirect("https://schwarzkopfb.codes/cf-plus")
+  })
   .put("/user", async function (ctx) {
     const result = ctx.request.body();
     ctx.assert(result.type === "json", Status.BadRequest);
