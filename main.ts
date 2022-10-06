@@ -104,7 +104,7 @@ if (SERVER_ACCESS_TOKEN) {
   app.use(async (ctx, next) => {
     const { request, response } = ctx;
 
-    if (request.headers.get("X-Access-Token") !== SERVER_ACCESS_TOKEN) {
+    if (request.url.pathname !== "/" && request.headers.get("X-Access-Token") !== SERVER_ACCESS_TOKEN) {
       response.status = Status.Unauthorized;
       return;
     }
