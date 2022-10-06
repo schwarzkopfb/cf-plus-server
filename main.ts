@@ -1,6 +1,7 @@
 import { Application, Router, Status } from "oak";
 import { oakCors } from "cors";
 import {
+  User,
   createUser,
   deleteUser,
   deleteUsers,
@@ -16,58 +17,57 @@ const app = new Application();
 const router = new Router();
 
 router
-  .get("/", (ctx) => {
-    ctx.response.redirect("https://schwarzkopfb.codes/cf-plus")
+  .get("/", ({ response }) => {
+    response.redirect("https://schwarzkopfb.codes/cf-plus");
   })
-  .put("/user", async function (ctx) {
-    const result = ctx.request.body();
-    ctx.assert(result.type === "json", Status.BadRequest);
-
+  .put("/user", async function ({ request, response, assert }) {
+    const result = request.body();
+    assert(result.type === "json", Status.BadRequest);
     const { username, numOfPowerUps, roomId } = await result.value;
-    ctx.assert(
+    assert(
       typeof username === "string" && username.length > 0,
       Status.BadRequest,
       "Username must be a non-empty string",
     );
-
-    ctx.assert(
-      !isNaN(numOfPowerUps) && numOfPowerUps > 0 && numOfPowerUps <= 30,
+    assert(
+      Number.isInteger(numOfPowerUps) && numOfPowerUps > 0 &&
+        numOfPowerUps <= 30,
       Status.BadRequest,
       "Number of power-ups must be a positive integer between 1 and 30",
     );
-
-    ctx.assert(roomId, Status.BadRequest, "Room ID must be provided");
+    assert(
+      typeof roomId === "string" && roomId.length > 0,
+      Status.BadRequest,
+      "Room ID must be a non-empty string",
+    );
 
     let user = await getUser(username);
     if (user) {
-      const data = {};
+      const fieldsToUpdate: Partial<User> = {};
       let changed = false;
 
       if (user.roomId !== roomId) {
-        data.roomId = roomId;
-        user.roomId = roomId;
+        fieldsToUpdate.roomId = user.roomId = roomId;
         changed = true;
       }
       if (user.numOfPowerUps !== numOfPowerUps) {
-        data.numOfPowerUps = numOfPowerUps;
-        user.numOfPowerUps = numOfPowerUps;
+        fieldsToUpdate.numOfPowerUps = user.numOfPowerUps = numOfPowerUps;
         changed = true;
       }
       if (changed) {
-        await updateUserFields(username, data);
+        await updateUserFields(username, fieldsToUpdate);
       }
 
-      ctx.response.status = Status.OK;
+      response.status = Status.OK;
     } else {
       user = await createUser(username, numOfPowerUps, roomId);
-      ctx.response.status = Status.Created;
+      response.status = Status.Created;
     }
 
-    ctx.response.body = user;
+    response.body = user;
   })
-  .get("/user/:username", async (ctx) => {
-    const { response } = ctx;
-    const user = await getUser(ctx.params.username);
+  .get("/user/:username", async ({ response, params }) => {
+    const user = await getUser(params.username);
 
     if (user) {
       response.status = Status.OK;
@@ -76,35 +76,38 @@ router
       response.status = Status.NotFound;
     }
   })
-  .delete("/user/:username", async (ctx) => {
-    const username = ctx.params.username;
+  .delete("/user/:username", async ({ response, params }) => {
+    const username = params.username;
 
     if (await isUserExists(username)) {
       await deleteUser(username);
-      ctx.response.status = Status.OK;
+      response.status = Status.OK;
     } else {
-      ctx.response.status = Status.NotFound;
+      response.status = Status.NotFound;
     }
   })
-  .get("/users", async (ctx) => {
-    ctx.response.body = await listUsers();
+  .get("/users", async ({ response }) => {
+    response.body = await listUsers();
   })
-  .delete("/users", async (ctx) => {
+  .delete("/users", async ({ response }) => {
     await deleteUsers();
-    ctx.response.status = Status.OK;
+    response.status = Status.OK;
   })
-  .patch("/room/:id/powerups", async (ctx) => {
-    await regeneratePowerUpSlotsInRoom(ctx.params.id);
-    ctx.response.status = Status.OK;
+  .patch("/room/:id/powerups", async ({ response, params }) => {
+    await regeneratePowerUpSlotsInRoom(params.id);
+    response.status = Status.OK;
   });
 
 app.use(oakCors());
 
 if (SERVER_ACCESS_TOKEN) {
-  app.use(async (ctx, next) => {
-    const { request, response } = ctx;
-
-    if (request.url.pathname !== "/" && request.headers.get("X-Access-Token") !== SERVER_ACCESS_TOKEN) {
+  app.use(async ({ request, response }, next) => {
+    if (
+      request.url.pathname !== "/" && !(
+        request.headers.get("X-Access-Token") === SERVER_ACCESS_TOKEN ||
+        request.url.searchParams.get("access_token") === SERVER_ACCESS_TOKEN
+      )
+    ) {
       response.status = Status.Unauthorized;
       return;
     }

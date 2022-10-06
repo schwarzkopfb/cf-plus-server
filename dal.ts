@@ -52,10 +52,10 @@ export async function createUser(
 
 export async function updateUserFields(
   username: string,
-  data: { [key]: keyof User | number },
+  fieldsToUpdate: Partial<User>,
 ): Promise<void> {
   await redis.hmset(`user:${username}`, {
-    ...data,
+    ...fieldsToUpdate,
     updatedAt: Date.now(),
   });
 }
