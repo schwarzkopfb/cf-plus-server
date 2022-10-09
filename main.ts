@@ -1,4 +1,4 @@
-import { Application, Router, Status } from "oak";
+import { Application, Router, Status, ServerSentEventTarget } from "oak";
 import { oakCors } from "cors";
 import {
   User,
@@ -13,6 +13,7 @@ import {
 } from "./dal.ts";
 
 const SERVER_ACCESS_TOKEN = Deno.env.get("CFP_SERVER_ACCESS_TOKEN") || "";
+const roomToSseTargets = new Map<string, Set<ServerSentEventTarget>>();
 const app = new Application();
 const router = new Router();
 
@@ -95,7 +96,32 @@ router
   })
   .patch("/room/:id/powerups", async ({ response, params }) => {
     await regeneratePowerUpSlotsInRoom(params.id);
+    roomToSseTargets.get(params.id)?.forEach((sseTarget) => {
+      sseTarget.dispatchMessage("powerups-regenerated");
+    });
     response.status = Status.OK;
+  })
+  .get("/room/:id/event-stream", (ctx) => {
+    const { id } = ctx.params;
+    const target = ctx.sendEvents();
+
+    target.addEventListener("close", (_) => {
+      const targets = roomToSseTargets.get(id);
+
+      targets?.delete(target);
+
+      if (targets?.size === 0) {
+        roomToSseTargets.delete(id);
+      }
+    });
+
+    const targets = roomToSseTargets.get(id);
+
+    if (targets) {
+      targets.add(target);
+    } else {
+      roomToSseTargets.set(id, new Set([target]));
+    }
   });
 
 app.use(oakCors());
